@@ -80,8 +80,9 @@ export const verifyEmail = async(req, res, next) => {
         return res.status(200).json({
             success:true,
             message:"User email is verified"
-        })
+        });
 
+        
     } catch (error) {
         return res.status(400).json({
             success:false,
@@ -92,7 +93,47 @@ export const verifyEmail = async(req, res, next) => {
 
 
 export const login = async(req, res, next) => {
-    res.send("login Route");
+    const {email, password} = req.body;
+    try {
+        
+        const user = await User.findOne({email})
+        if(!user){
+            return res.status(400).json({
+                success:false,
+                message:"Invalid Credentials"
+            })
+        }
+        
+        const isPasswordValid = await bcrypt.compare(password,user.password);
+        if(!isPasswordValid){
+            return res.status(400).json({
+                success:false,
+                message:"Invalid Credentials"
+            })
+        }
+
+        generateTokenAndSetCookie(res,user._id);
+        user.lastLogin = Date.now();
+        await user.save();
+
+        //sending response
+        return res.status(200).json({
+            success:true,
+            message:"User login successfully",
+            user:{
+                ...user._doc,
+                password:undefined
+            }
+        })
+
+
+
+    } catch (error) {
+        return res.status(400).json({
+            success:false,
+            message:error.message
+        })
+    }
 }
 export const logout = async(req, res, next) => {
     res.clearCookie('token');
