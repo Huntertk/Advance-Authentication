@@ -1,7 +1,8 @@
 import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
-import { sendVerificationEmail, sendWelcomeEmail } from "../mail/sendMail.js";
+import { sendPasswordResetEmail, sendVerificationEmail, sendWelcomeEmail } from "../mail/sendMail.js";
 
 export const signup = async(req, res, next) => {
     const {email, name, password} = req.body;
@@ -144,3 +145,36 @@ export const logout = async(req, res, next) => {
 }
 
 
+export const forgotPassword = async (req, res, next) => {
+    const {email} = req.body;
+    try {        
+        const user = await User.findOne({email});
+        if(!user){
+            return res.status(404).json({
+                success:false,
+                message:"User not found with email"
+            })
+        }
+        
+        //generate reset token
+        const resetToken = crypto.randomBytes(20).toString('hex');
+        const resetTokenExpiresAt = Date.now() + 1000*60*15;
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpiredAt = resetTokenExpiresAt;
+        await user.save();
+
+        //send email
+
+        await sendPasswordResetEmail(user.email, `${process.env.CLIENT_URL}/reset-token/${resetToken}`);
+        return res.status(200).json({
+            success:true,
+            message:"Passoword reset link is sent to your email"
+        })
+
+    } catch (error) {
+        return res.status(400).json({
+            success:false,
+            message:error.message
+        })
+    }
+}
