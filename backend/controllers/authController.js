@@ -2,7 +2,7 @@ import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
-import { sendPasswordResetEmail, sendVerificationEmail, sendWelcomeEmail } from "../mail/sendMail.js";
+import { sendPasswordResetEmail, sendResetSuccessEmail, sendVerificationEmail, sendWelcomeEmail } from "../mail/sendMail.js";
 
 export const signup = async(req, res, next) => {
     const {email, name, password} = req.body;
@@ -172,6 +172,57 @@ export const forgotPassword = async (req, res, next) => {
         })
 
     } catch (error) {
+        return res.status(400).json({
+            success:false,
+            message:error.message
+        })
+    }
+}
+
+export const resetPassword = async (req, res) => {
+    try {
+        const {token} = req.params;
+        const {password} = req.body;
+
+        if(!password){
+            return res.status(400).json({
+                success:false,
+                message:"Please enter your password to proceed"
+            })
+        }
+        const user = await User.findOne({
+            resetPasswordToken:token,
+            resetPasswordExpiredAt:{$gt:Date.now()}
+        })
+        if(!user){
+            return res.status(400).json({
+                success:false,
+                message:"Passoword reset token invalid or link is expired"
+            })
+        }        
+        //Hashing Pass
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        
+        //Updating User
+        user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpiredAt = undefined;
+
+        //Saving User
+        await user.save();
+
+        //Sending Mail
+        await sendResetSuccessEmail(user.email)
+
+        return res.status(200).json({
+            success:true,
+            message:"Passoword reset successfully"
+        })
+
+    } catch (error) {
+        console.log(error);
+        
         return res.status(400).json({
             success:false,
             message:error.message
