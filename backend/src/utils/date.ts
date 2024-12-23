@@ -14,3 +14,5 @@ export const fifteenMinutesFromNow = ():Date => {
         Date.now() + 15 * 60 * 1000
     )
 }
+
+export const ONE_DAY_MS =1000*60*60*24;
