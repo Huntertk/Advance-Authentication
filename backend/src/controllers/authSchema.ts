@@ -20,7 +20,12 @@ export const registerSchema = loginSchema.extend({
         message:"Password do not match",
         path:["confirmPassword"]
     }
-)
-
+) 
 
 export const verificationCodeSchema = z.string().min(1).max(24);
+
+export const resetPasswordSchema = z.object({
+    password:passwordSchema,
+    verificationCode:verificationCodeSchema
+})
+

@@ -8,6 +8,7 @@ import appAssert from "../utils/appAssert";
 import { fiveMinutesAgo, ONE_DAY_MS, oneHourFromNow, oneYearFromNow, thirtyDaysFromNow } from "../utils/date";
 import jwt from 'jsonwebtoken';
 import { RefreshTokenPayload, refreshTokenSignOptions, signToken, verifyToken } from "../utils/jwt";
+import { hashValue } from "../utils/bcrypt";
 
 
 export type createAccountParams = {
@@ -209,5 +210,39 @@ export const sendPasswordResetEmail = async (email:string) => {
     //return success
     return {
         url
+    }
+}
+
+type resetPasswordParams = {
+    password:string;
+    verificationCode:string;
+}
+
+export const resetPassword = async ({password,verificationCode}:resetPasswordParams) => {
+    //get verification code
+    const validCode = await VerificationCodeModel.findOne({
+        _id:verificationCode,
+        type:VerificationCodeType.PasswordReset,
+        // expiresAt:{$gt: new Date(Date.now())}
+    });
+
+    appAssert(validCode, NOT_FOUND, "invalid or expired verification code")
+    
+    //update the useres account 
+    const updatedUser = await UserModel.findByIdAndUpdate(validCode.userId,{
+        password: await hashValue(password)
+    });
+    appAssert(updatedUser, INTERNAL_SERVER_ERROR, "Failed to reset password")
+
+    //delete verification code 
+    await validCode.deleteOne();
+
+    //delete the session 
+    await SessionModel.deleteMany({
+        userId:updatedUser._id
+    })
+
+    return {
+        user:updatedUser.omitPassword()
     }
 }
