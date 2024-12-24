@@ -1,11 +1,11 @@
-import { JWT_REFRESH_SECRET, JWT_SECRET } from "../constants/env";
-import { CONFLICT, INTERNAL_SERVER_ERROR, NOT_FOUND, UNAUTHORIZED } from "../constants/httpCode";
+import { APP_ORIGIN, JWT_REFRESH_SECRET, JWT_SECRET } from "../constants/env";
+import { CONFLICT, INTERNAL_SERVER_ERROR, NOT_FOUND, TOO_MANY_REQUESTS, UNAUTHORIZED } from "../constants/httpCode";
 import VerificationCodeType from "../constants/verificationCodeType";
 import SessionModel from "../models/sessionModel";
 import UserModel from "../models/userModel";
 import VerificationCodeModel from "../models/verificationCodeModel";
 import appAssert from "../utils/appAssert";
-import { ONE_DAY_MS, oneYearFromNow, thirtyDaysFromNow } from "../utils/date";
+import { fiveMinutesAgo, ONE_DAY_MS, oneHourFromNow, oneYearFromNow, thirtyDaysFromNow } from "../utils/date";
 import jwt from 'jsonwebtoken';
 import { RefreshTokenPayload, refreshTokenSignOptions, signToken, verifyToken } from "../utils/jwt";
 
@@ -177,5 +177,37 @@ export const verifyEmail = async(code:string) => {
     //return the user
     return {
         user:updatedUser.omitPassword()
+    }
+}
+
+
+export const sendPasswordResetEmail = async (email:string) => {
+    //get the user
+    const user = await UserModel.findOne({email})
+    appAssert(user, NOT_FOUND, "User not found");
+
+    //check the email rate limit
+    const fiveMinAgo = fiveMinutesAgo();  
+    const count = await VerificationCodeModel.countDocuments({
+        userId:user._id,
+        type:VerificationCodeType.PasswordReset,
+        createdAt:{$gt: fiveMinAgo}
+    })
+
+    appAssert(count <= 1, TOO_MANY_REQUESTS, "Too many request, try again later");
+
+    //create verification code
+    const expiresAt = oneHourFromNow();
+    const verificationCode = await VerificationCodeModel.create({
+        userId: user._id,
+        type:VerificationCodeType.PasswordReset,
+        expiresAt
+    })
+    //send verification email
+    const url = `${APP_ORIGIN}/password/reset?code=${verificationCode._id}&exp=${expiresAt.getTime()}`
+
+    //return success
+    return {
+        url
     }
 }

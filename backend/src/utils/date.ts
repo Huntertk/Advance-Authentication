@@ -16,3 +16,10 @@ export const fifteenMinutesFromNow = ():Date => {
 }
 
 export const ONE_DAY_MS =1000*60*60*24;
+
+export const fiveMinutesAgo = () => {
+    return new Date(Date.now() - 5 * 60 * 1000)
+}
+export const oneHourFromNow = () => {
+    return new Date(Date.now() - 60 * 60 * 1000)
+}
